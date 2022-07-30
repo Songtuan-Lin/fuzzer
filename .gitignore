@@ -1,1 +1,2 @@
 *.pddl
+__pycache__/
