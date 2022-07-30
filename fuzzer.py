@@ -53,7 +53,6 @@ class FuzzPosEff(Fuzz):
         if pop_idx == -1:
             raise InvalidFuzzError("{} not in Pos-effs:{}".format(self.atom, self.action.name))
         self.action.effects.pop(pop_idx)
-        print(self)
     
 class FuzzNegEff(Fuzz):
     def __str__(self):
@@ -68,8 +67,7 @@ class FuzzNegEff(Fuzz):
             if arg not in action_args:
                 raise InvalidFuzzError("Patameter types: {} not matching Neg-effs: {}".format(self.atom, self.action.name))
         self.action.effects.append(Effect([], Truth(), self.atom.negate()))
-        print(self)
-
+        
 class FuzzPrec(Fuzz):
     def __str__(self):
         return "<Add {} to Prec: {}>".format(self.atom, self.action.name)
@@ -88,11 +86,11 @@ class FuzzPrec(Fuzz):
         new_prec = [a for a in atoms]
         new_prec.append(self.atom)
         self.action.precondition = Conjunction(new_prec)
-        print(self)
 
 class Fuzzer:
     def __init__(self, domain_file, task_file):
         self.task = pddl_file.open(task_file, domain_file)
+        self.__fuzz_ops = []
 
     def __matched_atoms(self, action):
         atoms = []
@@ -117,18 +115,24 @@ class Fuzzer:
     def __fuzz_prec(self, action):
         atoms = self.__matched_atoms(action)
         atom = random.choice(atoms)
-        FuzzPrec(action, atom).apply()
+        op = FuzzPrec(action, atom)
+        op.apply()
+        self.__fuzz_ops.append(op)
     
     def __fuzz_neg_effs(self, action):
         atoms = self.__matched_atoms(action)
         atom = random.choice(atoms)
-        FuzzNegEff(action, atom).apply()
+        op = FuzzNegEff(action, atom)
+        op.apply()
+        self.__fuzz_ops.append(op)
 
     def __fuzz_pos_effs(self, action):
         atoms = [eff.literal for eff in action.effects if not eff.literal.negated]
         if len(atoms) != 0:
             atom = random.choice(atoms)
-            FuzzPosEff(action, atom).apply()
+            op = FuzzPosEff(action, atom)
+            op.apply()
+            self.__fuzz_ops.append(op)
 
     def fuzz(self, k = 1):
         ops = [self.__fuzz_prec, self.__fuzz_pos_effs, self.__fuzz_neg_effs]
@@ -140,6 +144,11 @@ class Fuzzer:
     def write_domain(self, output_dir):
         with open(os.path.join(output_dir, "domain.pddl"), "w") as f:
             f.write(self.task.domain())
+
+    def write_ops(self, output_dir):
+        with open(os.path.join(output_dir, "fuzz_ops.txt"), "w") as f:
+            for op in self.__fuzz_ops:
+                f.write("{}\n".format(op))
 
 if __name__ == "__main__":
     domain_file = "/home/garrick/projects/diagnosis/domain.pddl"
