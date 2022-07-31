@@ -101,6 +101,8 @@ if __name__ == "__main__":
             except Exception as e:
                 logging.error(traceback.format_exc())
                 shutil.rmtree(task_out_dir)
+                if len(os.listdir(domain_out_dir)) == 0:
+                    shutil.rmtree(domain_out_dir)
                 continue
             subprocess.run(["cp", tf_path, os.path.join(task_out_dir, task_file)])
             fuzzed_tasks.append((df_path, tf_path, task_out_dir))
