@@ -1,19 +1,58 @@
 import os
 import math
+import sys
 import argparse
 import subprocess
+import multiprocessing
 import logging
 import traceback
+import shutil
+from tqdm import tqdm
 from fuzzer import Fuzzer
 
 arg_parser = argparse.ArgumentParser(description="CMD Arguments for Fuzzer")
 arg_parser.add_argument("benchmark_dir", type=str, help="Directory of the benchmark")
 arg_parser.add_argument("output_dir", type=str, help="Directory of the output")
 arg_parser.add_argument("err_rate", type=float, help="Percentage of actions modified")
+arg_parser.add_argument("--downward", default=None, type=str, help="Path to fast-downward")
+arg_parser.add_argument("--num_workers", default=None, type=int, help="Number of working processes")
+
+logging.basicConfig(filename="err.log", level=logging.DEBUG, 
+                    format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logger=logging.getLogger(__name__)
+
+def run_downward(dir_info):
+    df_path, tf_path, plan_out_path = dir_info
+    assert(args.downward is not None)
+    pf_path = os.path.join(plan_out_path, "sas_plan")
+    cmd = [sys.executable, args.downward, "--alias", "lama-first", "--overall-time-limit", "300", "--plan-file", pf_path, df_path, tf_path]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    outs, errs = proc.communicate()
+    with open(os.path.join(plan_out_path, "downward_meta_info"), "w") as f:
+        f.write(outs)
+        f.write(errs)
+    if proc.returncode != 0:
+        return False
+    else:
+        return True
+
+def start_downward(dir_infos):
+
+    num_cpus = multiprocessing.cpu_count()
+    num_workers = args.num_workers if args.num_workers is not None else num_cpus
+    print("===== Starting Running Fast Downward =====" + "\n")
+    print("- Number of workers: {}\n".format(num_workers))
+    print("- Number of fuzzed tasks: {}\n".format(len(dir_infos)))
+    with multiprocessing.Pool(num_workers) as p:
+        r = list(tqdm(p.imap(run_downward, dir_infos), total=len(dir_infos)))
+    print("- Number of tasks whose solution have been found: {}\n".format(len([t for t in r if t])))
+
 
 if __name__ == "__main__":
     args = arg_parser.parse_args()
     benchmark_dir = args.benchmark_dir
+    fuzzed_tasks = []
+    print("==== Starting fuzzing domains =====\n")
     for d in os.listdir(benchmark_dir):
         if not os.path.isdir(os.path.join(benchmark_dir, d)):
             continue
@@ -24,9 +63,6 @@ if __name__ == "__main__":
         task_files = [fn for fn in os.listdir(domain_dir) if "domain" not in fn and ".pddl" in fn]
 
         domain_out_dir = os.path.join(args.output_dir, domain_name)
-
-        if not os.path.exists(domain_out_dir):
-            os.mkdir(domain_out_dir)
 
         if len(domain_files) != 1:
             continue
@@ -47,21 +83,34 @@ if __name__ == "__main__":
                     break
             if has_uf:
                 continue
-
             task_out_dir = os.path.join(domain_out_dir, task_name)
-            if not os.path.exists(task_out_dir):
-                os.mkdir(task_out_dir)
             task_out_fuzzed_dir = os.path.join(task_out_dir, "err-rate-{}".format(args.err_rate))
-            if not os.path.exists(task_out_fuzzed_dir):
-                os.mkdir(task_out_fuzzed_dir)
             num_fuzzed_actions = math.ceil(len(fuzzer.task.actions) * args.err_rate)
             try:
                 fuzzer.fuzz(num_fuzzed_actions)
+                if not os.path.exists(domain_out_dir):
+                    os.mkdir(domain_out_dir)
+                if not os.path.exists(task_out_dir):
+                    os.mkdir(task_out_dir)
+                if not os.path.exists(task_out_fuzzed_dir):
+                    os.mkdir(task_out_fuzzed_dir)
+
                 fuzzer.write_domain(task_out_fuzzed_dir)
                 fuzzer.write_ops(task_out_fuzzed_dir)
-                subprocess.run(["cp", tf_path, os.path.join(task_out_dir, task_file)])
             except Exception as e:
                 logging.error(traceback.format_exc())
+                shutil.rmtree(task_out_dir)
+                continue
+            subprocess.run(["cp", tf_path, os.path.join(task_out_dir, task_file)])
+            fuzzed_tasks.append((df_path, tf_path, task_out_dir))
+    print("- Finished\n")
+
+    if args.downward is not None:
+        start_downward(fuzzed_tasks)
+
+    
+
+            
 
 
 

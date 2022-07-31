@@ -1,2 +1,4 @@
 *.pddl
 __pycache__/
+*.log
+*.sas
