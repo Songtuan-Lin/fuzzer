@@ -88,16 +88,10 @@ class Task(object):
                 axiom.dump()
 
     def domain(self):
-        return "(define (domain {domain_name}) \
-               {requirements} \
-               (:types {types}) \
-               (:constants {constants}) \
-               (:predicates {predicates}) \
-               (:functions {functions}) \
-               {actions} )".format(predicates='\n'.join(x.pddl() for x in self.predicates),
-                             functions='\n'.join(x.pddl() for x in self.functions),
-                             actions='\n'.join(x.pddl() for x in self.actions),
-                             types=' '.join(x.pddl() for x in self.types),
+        return "(define (domain {domain_name})\n  {requirements}\n  (:types\n\t{types})\n  (:constants {constants})\n  (:predicates\n\t{predicates})\n  (:functions {functions})\n  {actions} )".format(predicates='\n\t'.join(x.pddl() for x in self.predicates),
+                             functions='\n\t'.join(x.pddl() for x in self.functions),
+                             actions='\n\n'.join(x.pddl() for x in self.actions),
+                             types='\n\t'.join(x.pddl() for x in self.types),
                              constants=' '.join(x.pddl() for x in self.constants),
                              domain_name=self.domain_name,
                              requirements=self.requirements.pddl())

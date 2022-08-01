@@ -9,6 +9,10 @@ import traceback
 import shutil
 from tqdm import tqdm
 from fuzzer import Fuzzer
+from fd.pddl.conditions import Conjunction
+from fd.pddl.conditions import Atom
+from fd.pddl.conditions import Truth
+from fd.pddl.effects import Effect
 
 arg_parser = argparse.ArgumentParser(description="CMD Arguments for Fuzzer")
 arg_parser.add_argument("benchmark_dir", type=str, help="Directory of the benchmark")
@@ -84,6 +88,41 @@ if __name__ == "__main__":
                     break
             if has_uf:
                 continue
+
+            has_unsp_prec = False
+            for a in fuzzer.task.actions:
+                if has_unsp_prec:
+                    break
+                if not (isinstance(a.precondition, Conjunction) or isinstance(a.precondition, Atom)):
+                    has_unsp_prec = True
+                    break 
+                atoms = (a.precondition,)
+                if isinstance(a.precondition, Conjunction):
+                    atoms = a.precondition.parts
+                for atom in atoms:
+                    if not isinstance(atom, Atom):
+                        has_unsp_prec = True
+                        break
+                    if atom.negated:
+                        has_unsp_prec = True
+                        break
+            if has_unsp_prec:
+                continue
+
+            has_unsp_effs = False
+            for a in fuzzer.task.actions:
+                if has_unsp_effs:
+                    break
+                for eff in a.effects:
+                    if not isinstance(eff, Effect):
+                        has_unsp_effs = True
+                        break
+                    if eff.condition != Truth() or len(eff.parameters) != 0:
+                        has_unsp_effs = True
+                        break
+            if has_unsp_effs:
+                continue
+
             task_out_dir = os.path.join(domain_out_dir, task_name)
             task_out_fuzzed_dir = os.path.join(task_out_dir, "err-rate-{}".format(args.err_rate))
             num_fuzzed_actions = math.ceil(len(fuzzer.task.actions) * args.err_rate)

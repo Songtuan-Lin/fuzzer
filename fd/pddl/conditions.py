@@ -191,7 +191,7 @@ class Conjunction(JunctorCondition):
     def negate(self):
         return Disjunction([p.negate() for p in self.parts])
     def pddl(self):
-        return '(and {0})'.format(' '.join(x.pddl() for x in self.parts))
+        return '(and\n\t\t{0})'.format('\n\t\t'.join(x.pddl() for x in self.parts))
 
 class Disjunction(JunctorCondition):
     def _simplified(self, parts):
