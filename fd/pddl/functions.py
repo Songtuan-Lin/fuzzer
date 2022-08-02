@@ -5,11 +5,12 @@ class Function(object):
         self.name = name
         self.arguments = arguments
     @classmethod
-    def parse(cls, alist):
+    def parse(cls, alist, type_name):
         name = alist[0]
         arguments = pddl_types.parse_typed_list(alist[1:],
                                                 default_type="number")
         return cls(name, arguments)
+        
     def __str__(self):
         result = "%s(%s)" % (self.name, ", ".join(map(str, self.arguments)))
         if self.type:

@@ -37,6 +37,37 @@ class Fuzz:
     def apply(self):
         pass
 
+class FuzzAddEff(Fuzz):
+    def __str__(self):
+        return "<Add {} to Effs: {}>".format(self.atom, self.action.name)
+
+    def __repr__(self):
+        return str(self)
+
+    def apply(self):
+        action_args = set(p.name for p in self.action.parameters)
+        for arg in self.atom.args:
+            if arg not in action_args:
+                raise InvalidFuzzError("Patameter types: {} not matching Neg-effs: {}".format(self.atom, self.action.name))
+        self.action.effects.append(Effect([], Truth(), self.atom))
+
+class FuzzDelEff(Fuzz):
+    def __str__(self):
+        return "<Remove {} from Effs: {}>".format(self.atom, self.action.name)
+    
+    def __repr__(self):
+        return str(self)
+
+    def apply(self):
+        pop_idx = -1
+        for idx, eff in enumerate(self.action.effects):
+            if eff.literal == self.atom:
+                pop_idx = idx
+                break
+        if pop_idx == -1:
+            raise InvalidFuzzError("{} not in Effs:{}".format(self.atom, self.action.name))
+        self.action.effects.pop(pop_idx)
+
 class FuzzPosEff(Fuzz):
     def __str__(self):
         return "<Remove {} from Pos-effs: {}>".format(self.atom, self.action.name)
@@ -90,9 +121,9 @@ class FuzzPrec(Fuzz):
 class Fuzzer:
     def __init__(self, domain_file, task_file):
         self.task = pddl_file.open(task_file, domain_file)
-        self.__fuzz_ops = []
+        self._fuzz_ops = []
 
-    def __matched_atoms(self, action):
+    def _matched_atoms(self, action):
         atoms = []
         for pred in self.task.predicates:
             matched_args = []
@@ -112,30 +143,30 @@ class Fuzzer:
                     atoms.append(Atom(pred.name, t))
         return atoms
 
-    def __fuzz_prec(self, action):
-        atoms = self.__matched_atoms(action)
+    def _fuzz_prec(self, action):
+        atoms = self._matched_atoms(action)
         atom = random.choice(atoms)
         op = FuzzPrec(action, atom)
         op.apply()
-        self.__fuzz_ops.append(op)
+        self._fuzz_ops.append(op)
     
-    def __fuzz_neg_effs(self, action):
-        atoms = self.__matched_atoms(action)
+    def _fuzz_neg_effs(self, action):
+        atoms = self._matched_atoms(action)
         atom = random.choice(atoms)
         op = FuzzNegEff(action, atom)
         op.apply()
-        self.__fuzz_ops.append(op)
+        self._fuzz_ops.append(op)
 
-    def __fuzz_pos_effs(self, action):
+    def _fuzz_pos_effs(self, action):
         atoms = [eff.literal for eff in action.effects if not eff.literal.negated]
         if len(atoms) != 0:
             atom = random.choice(atoms)
             op = FuzzPosEff(action, atom)
             op.apply()
-            self.__fuzz_ops.append(op)
+            self._fuzz_ops.append(op)
 
     def fuzz(self, k = 1):
-        ops = [self.__fuzz_prec, self.__fuzz_pos_effs, self.__fuzz_neg_effs]
+        ops = [self._fuzz_prec, self._fuzz_pos_effs, self._fuzz_neg_effs]
         op = random.choice(ops)
         actions = random.sample(self.task.actions, k)
         for action in actions:
@@ -147,12 +178,41 @@ class Fuzzer:
 
     def write_ops(self, output_dir):
         with open(os.path.join(output_dir, "fuzz_ops.txt"), "w") as f:
-            for op in self.__fuzz_ops:
+            for op in self._fuzz_ops:
                 f.write("{}\n".format(op))
 
+class FuzzerNegPrec(Fuzzer):
+    def _fuzz_prec_neg(self, action):
+        atoms = self._matched_atoms(action)
+        atom = random.choice(atoms)
+        op = FuzzPrec(action, atom.negate())
+        op.apply()
+        self._fuzz_ops.append(op)
+    
+    def _fuzz_neg_effs_del(self, action):
+        atoms = [eff.literal for eff in action.effects if eff.literal.negated]
+        if len(atoms) != 0:
+            atom = random.choice(atoms)
+            op = FuzzDelEff(action, atom)
+            op.apply()
+            self._fuzz_ops.append(op)
+
+    def _fuzz_pos_effs_add(self, action):
+        atoms = self._matched_atoms(action)
+        atom = random.choice(atoms)
+        op = FuzzAddEff(action, atom)
+        op.apply()
+        self._fuzz_ops.append(op)
+
+    def fuzz(self, k = 1):
+        ops = [self._fuzz_prec, self._fuzz_pos_effs, self._fuzz_pos_effs_add, self._fuzz_neg_effs, self._fuzz_neg_effs_del]
+        op = random.choice(ops)
+        actions = random.sample(self.task.actions, k)
+        for action in actions:
+            op(action)
+
 if __name__ == "__main__":
-    domain_file = "/home/garrick/projects/diagnosis/domain.pddl"
-    task_file = "/home/garrick/projects/diagnosis/p18.pddl"
+    domain_file = "/home/users/u6162630/Datasets/downward-benchmarks/woodworking-opt11-strips/domain.pddl"
+    task_file = "/home/users/u6162630/Datasets/downward-benchmarks/woodworking-opt11-strips/p01.pddl"
     fuzzer = Fuzzer(domain_file, task_file)
     fuzzer.fuzz(3)
-    fuzzer.write_domain(os.getcwd())
