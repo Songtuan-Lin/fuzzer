@@ -143,6 +143,14 @@ class Fuzzer:
                     atoms.append(Atom(pred.name, t))
         return atoms
 
+    def _filter_preds_neg(self, action, atoms):
+        neg_atoms = [eff.literal.negate() for eff in action.effects if eff.literal.negated]
+        r = []
+        for a in atoms:
+            if a not in neg_atoms:
+                r.append(a)
+        return r
+
     def _fuzz_prec(self, action):
         atoms = self._matched_atoms(action)
         atom = random.choice(atoms)
@@ -152,6 +160,7 @@ class Fuzzer:
     
     def _fuzz_neg_effs(self, action):
         atoms = self._matched_atoms(action)
+        atoms = self._filter_preds_neg(action, atoms)
         atom = random.choice(atoms)
         op = FuzzNegEff(action, atom)
         op.apply()
@@ -167,9 +176,9 @@ class Fuzzer:
 
     def fuzz(self, k = 1):
         ops = [self._fuzz_prec, self._fuzz_pos_effs, self._fuzz_neg_effs]
-        op = random.choice(ops)
         actions = random.sample(self.task.actions, k)
         for action in actions:
+            op = random.choice(ops)
             op(action)
     
     def write_domain(self, output_dir):
@@ -182,6 +191,14 @@ class Fuzzer:
                 f.write("{}\n".format(op))
 
 class FuzzerNegPrec(Fuzzer):
+    def _filter_preds_pos(self, action, atoms):
+        pos_atoms = [eff.literal for eff in action.effects if not eff.literal.negated]
+        r = []
+        for a in atoms:
+            if a not in pos_atoms:
+                r.append(a)
+        return r
+
     def _fuzz_prec_neg(self, action):
         atoms = self._matched_atoms(action)
         atom = random.choice(atoms)
@@ -199,6 +216,7 @@ class FuzzerNegPrec(Fuzzer):
 
     def _fuzz_pos_effs_add(self, action):
         atoms = self._matched_atoms(action)
+        atoms = self._filter_preds_pos(action, atoms)
         atom = random.choice(atoms)
         op = FuzzAddEff(action, atom)
         op.apply()
@@ -206,10 +224,10 @@ class FuzzerNegPrec(Fuzzer):
 
     def fuzz(self, k = 1):
         ops = [self._fuzz_prec, self._fuzz_pos_effs, self._fuzz_pos_effs_add, self._fuzz_neg_effs, self._fuzz_neg_effs_del]
-        op = random.choice(ops)
         actions = random.sample(self.task.actions, k)
         for action in actions:
-            op(action)
+            op = random.choices(population=ops, weights=[0.1, 0.2, 0.5, 0.1, 0.1], k=1)
+            op[0](action)
 
 if __name__ == "__main__":
     domain_file = "/home/users/u6162630/Datasets/downward-benchmarks/woodworking-opt11-strips/domain.pddl"
