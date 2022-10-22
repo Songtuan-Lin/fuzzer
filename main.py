@@ -30,7 +30,7 @@ def run_downward(dir_info):
     assert(args.downward is not None)
     pf_path = os.path.join(plan_out_path, "sas_plan")
     sas_path = os.path.join(plan_out_path, "output.sas")
-    cmd = [sys.executable, args.downward, "--alias", "lama-first", "--overall-time-limit", "300", "--plan-file", pf_path, "--sas-file", sas_path, df_path, tf_path]
+    cmd = [sys.executable, args.downward, "--alias", "lama-first", "--overall-time-limit", "900", "--plan-file", pf_path, "--sas-file", sas_path, df_path, tf_path]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     outs, errs = proc.communicate()
     with open(os.path.join(plan_out_path, "downward_meta_info"), "w") as f:
