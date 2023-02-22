@@ -1,23 +1,11 @@
 import os
 import random
+import util
 from fd.pddl import pddl_file
 from fd.pddl.conditions import Atom
 from fd.pddl.conditions import Conjunction
 from fd.pddl.conditions import Truth
 from fd.pddl.effects import Effect
-
-def find_all_tuples(all_combs):
-    if len(all_combs) == 0:
-        return [tuple()]
-    results = set()
-    tail = all_combs.pop(-1)
-    heads = find_all_tuples(all_combs)
-    for e in tail:
-        for t in heads:
-            t= list(t)
-            t.append(e)
-            results.add(tuple(t))
-    return results
 
 class InvalidFuzzError(Exception):
     def __init__(self, err_msg):
@@ -25,6 +13,55 @@ class InvalidFuzzError(Exception):
     
     def __str__(self):
         return self.err_msg
+    
+    def __repr__(self):
+        return str(self)
+
+class InvalidOperationError(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+    
+    def __str__(self):
+        return self.msg
+    
+    def __repr__(self):
+        return str(self)
+
+class Operation:
+    def __init__(self, action, atom):
+        self.action = action
+        self.atom = atom
+    
+    def apply(self):
+        raise NotImplementedError
+
+class EffInsertion(Operation):
+    def __str__(self) -> str:
+        msg = "<Add {} to Effs: {}>".format(
+                self.atom, 
+                self.action.name)
+        return msg
+    
+    def __repr__(self) -> str:
+        return str(self)
+
+    def apply(self) -> None:
+        action_args = set()
+        for p in self.action.parameter:
+            action_args.add(p.name)
+        for arg in self.atom.args:
+            if arg not in action_args:
+                msg = "Inconsistent Arguments: {} and {}".format(
+                        self.atom, self.action.name)
+                raise InvalidOperationError(msg)
+        eff = Effect([], Truth(), self.atom)
+        self.action.effects.append(eff)
+
+class EffDeletion(Operation):
+    def __str__(self):
+        msg = "<Remove {} from Effs: {}>".format(
+                self.atom, self.action.name)
+        return msg
     
     def __repr__(self):
         return str(self)
