@@ -2,7 +2,7 @@ import os
 import random
 from options import setup
 from util import getAllTuples
-from typing import List
+from typing import List, Union
 from domain import Domain
 from operations import EffInsertion
 from operations import EffDeletion
@@ -62,7 +62,7 @@ class Fuzzer:
     def _getAtomsMatchingAction(
             self,
             negated : bool, 
-            action : Action) -> List[Atom]:
+            action : Action) -> List[Union[Atom, NegatedAtom]]:
         atoms = []
         for predicate in self.domain.predicates:
             args = self._getArguments(predicate, action)
