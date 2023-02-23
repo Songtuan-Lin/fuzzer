@@ -1,3 +1,0 @@
-<Add NegatedAtom distributor(?x) to Effs: unload>
-<Add NegatedAtom lifting(?z, ?x) to Effs: drop>
-<Add Atom surface(?z) to Prec: load>
