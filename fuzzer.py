@@ -1,273 +1,218 @@
 import os
 import random
-import util
+from util import getAllTuples
+from typing import List
+from operations import EffInsertion
+from operations import EffDeletion
+from operations import PrecondInsertion
+from operations import InvalidDomainError
 from fd.pddl import pddl_file
-from fd.pddl.conditions import Atom
+from fd.pddl.actions import Action
+from fd.pddl.conditions import Atom, NegatedAtom
 from fd.pddl.conditions import Conjunction
-from fd.pddl.conditions import Truth
-from fd.pddl.effects import Effect
-
-class InvalidFuzzError(Exception):
-    def __init__(self, err_msg):
-        self.err_msg = err_msg
-    
-    def __str__(self):
-        return self.err_msg
-    
-    def __repr__(self):
-        return str(self)
-
-class InvalidOperationError(Exception):
-    def __init__(self, msg):
-        self.msg = msg
-    
-    def __str__(self):
-        return self.msg
-    
-    def __repr__(self):
-        return str(self)
-
-class Operation:
-    def __init__(self, action, atom):
-        self.action = action
-        self.atom = atom
-    
-    def apply(self):
-        raise NotImplementedError
-
-class EffInsertion(Operation):
-    def __str__(self) -> str:
-        msg = "<Add {} to Effs: {}>".format(
-                self.atom, 
-                self.action.name)
-        return msg
-    
-    def __repr__(self) -> str:
-        return str(self)
-
-    def apply(self) -> None:
-        action_args = set()
-        for p in self.action.parameter:
-            action_args.add(p.name)
-        for arg in self.atom.args:
-            if arg not in action_args:
-                msg = "Inconsistent Arguments: {} and {}".format(
-                        self.atom, self.action.name)
-                raise InvalidOperationError(msg)
-        eff = Effect([], Truth(), self.atom)
-        self.action.effects.append(eff)
-
-class EffDeletion(Operation):
-    def __str__(self):
-        msg = "<Remove {} from Effs: {}>".format(
-                self.atom, self.action.name)
-        return msg
-    
-    def __repr__(self):
-        return str(self)
-
-class Fuzz:
-    def __init__(self, action, atom):
-        self.action = action
-        self.atom = atom
-    
-    def apply(self):
-        pass
-
-class FuzzAddEff(Fuzz):
-    def __str__(self):
-        return "<Add {} to Effs: {}>".format(self.atom, self.action.name)
-
-    def __repr__(self):
-        return str(self)
-
-    def apply(self):
-        action_args = set(p.name for p in self.action.parameters)
-        for arg in self.atom.args:
-            if arg not in action_args:
-                raise InvalidFuzzError("Patameter types: {} not matching Neg-effs: {}".format(self.atom, self.action.name))
-        self.action.effects.append(Effect([], Truth(), self.atom))
-
-class FuzzDelEff(Fuzz):
-    def __str__(self):
-        return "<Remove {} from Effs: {}>".format(self.atom, self.action.name)
-    
-    def __repr__(self):
-        return str(self)
-
-    def apply(self):
-        pop_idx = -1
-        for idx, eff in enumerate(self.action.effects):
-            if eff.literal == self.atom:
-                pop_idx = idx
-                break
-        if pop_idx == -1:
-            raise InvalidFuzzError("{} not in Effs:{}".format(self.atom, self.action.name))
-        self.action.effects.pop(pop_idx)
-
-class FuzzPosEff(Fuzz):
-    def __str__(self):
-        return "<Remove {} from Pos-effs: {}>".format(self.atom, self.action.name)
-    
-    def __repr__(self):
-        return str(self)
-
-    def apply(self):
-        pop_idx = -1
-        for idx, eff in enumerate(self.action.effects):
-            if not eff.literal.negated and eff.literal == self.atom:
-                pop_idx = idx
-                break
-        if pop_idx == -1:
-            raise InvalidFuzzError("{} not in Pos-effs:{}".format(self.atom, self.action.name))
-        self.action.effects.pop(pop_idx)
-    
-class FuzzNegEff(Fuzz):
-    def __str__(self):
-        return "<Add {} to Neg-effs: {}>".format(self.atom, self.action.name)
-
-    def __repr__(self):
-        return str(self)
-
-    def apply(self):
-        action_args = set(p.name for p in self.action.parameters)
-        for arg in self.atom.args:
-            if arg not in action_args:
-                raise InvalidFuzzError("Patameter types: {} not matching Neg-effs: {}".format(self.atom, self.action.name))
-        self.action.effects.append(Effect([], Truth(), self.atom.negate()))
-        
-class FuzzPrec(Fuzz):
-    def __str__(self):
-        return "<Add {} to Prec: {}>".format(self.atom, self.action.name)
-
-    def __repr__(self):
-        return str(self)
-
-    def apply(self):
-        action_args = set(p.name for p in self.action.parameters)
-        for arg in self.atom.args:
-            if arg not in action_args:
-                raise InvalidFuzzError("Patameter types: {} not matching Prec: {}".format(self.atom, self.action.name))
-        atoms = (self.action.precondition,)
-        if isinstance(self.action.precondition, Conjunction):
-            atoms = self.action.precondition.parts
-        new_prec = [a for a in atoms]
-        new_prec.append(self.atom)
-        self.action.precondition = Conjunction(new_prec)
 
 class Fuzzer:
-    def __init__(self, domain_file, task_file):
-        self.task = pddl_file.open(task_file, domain_file)
-        self._fuzz_ops = []
-
-    def _matched_atoms(self, action):
-        atoms = []
-        for pred in self.task.predicates:
-            matched_args = []
-            valid_pred = True
-            for arg in pred.arguments:
-                matched_vars = []
-                for para in action.parameters:
-                    if para.type == arg.type:
-                        matched_vars.append(para.name)
-                if len(matched_vars) == 0:
-                    valid_pred = False
-                    break
-                matched_args.append(matched_vars)
-            if valid_pred:
-                all_tuples = find_all_tuples(matched_args)
-                for t in all_tuples:
-                    atoms.append(Atom(pred.name, t))
+    def __init__(
+            self, k : int,
+            domainFile : str,
+            taskFile : str) -> None:
+        self.task = pddl_file.open(
+                taskFile, domainFile)
+        self.hasNegPrecond = False
+        if not self._validated():
+            raise InvalidDomainError
+        self._ops = []
+        self._fetch = (
+                lambda negated : lambda xs : 
+                    list(filter(lambda y : y.negated == negated, 
+                                xs)))
+        self._filter = lambda xs : lambda x : x not in xs
+        self._fuzz(k)
+    
+    def _getAtomsForInsertion(
+            self, negated : bool, 
+            action : Action) -> List[Atom]:
+        atoms = [eff.literal for eff in action.effects]
+        existingAtoms = self._fetch(negated)(atoms)
+        atoms = self._getAtomsMatchingAction(
+                negated, action)
+        atoms = filter(
+                self._filter(existingAtoms),
+                atoms)
         return atoms
 
-    def _filter_preds_neg(self, action, atoms):
-        neg_atoms = [eff.literal.negate() for eff in action.effects if eff.literal.negated]
-        r = []
-        for a in atoms:
-            if a not in neg_atoms:
-                r.append(a)
-        return r
-
-    def _fuzz_prec(self, action):
-        atoms = self._matched_atoms(action)
-        atom = random.choice(atoms)
-        op = FuzzPrec(action, atom)
-        op.apply()
-        self._fuzz_ops.append(op)
+    def _getMatchedVars(self, arg, action):
+        vars = [para for para in action.parameters]
+        vars = filter(
+                lambda v : v.type == arg.type, 
+                vars)
+        vars = [v.name for v in vars]
+        return vars
     
-    def _fuzz_neg_effs(self, action):
-        atoms = self._matched_atoms(action)
-        atoms = self._filter_preds_neg(action, atoms)
-        atom = random.choice(atoms)
-        op = FuzzNegEff(action, atom)
+    def _getArguments(self, predicate, action):
+        args = list()
+        for arg in predicate.arguments:
+            vars = self._getMatchedVars(
+                        arg, action)
+            if not len(vars):
+                return None
+            args.append(vars)
+        return args
+
+    def _getAtomsMatchingAction(
+            self,
+            negated : bool, 
+            action : Action) -> List[Atom]:
+        atoms = []
+        for predicate in self.task.predicates:
+            args = self._getArguments(predicate, action)
+            if args is None:
+                continue
+            combinations = getAllTuples(args)
+            if negated:
+                constructor = (
+                        lambda n : lambda t : 
+                            NegatedAtom(n, t))
+            else:
+                constructor = (
+                        lambda n : lambda t :
+                            Atom(n, t))
+            for t in combinations:
+                atom = constructor(predicate.name)(t)
+                atoms.append(atom)
+        return atoms
+    
+    def _insertEff(
+            self, 
+            action : Action, 
+            atom : Atom) -> None:
+        op = EffInsertion(action, atom)
         op.apply()
-        self._fuzz_ops.append(op)
+        self._ops.append(op)
 
-    def _fuzz_pos_effs(self, action):
-        atoms = [eff.literal for eff in action.effects if not eff.literal.negated]
-        if len(atoms) != 0:
-            atom = random.choice(atoms)
-            op = FuzzPosEff(action, atom)
-            op.apply()
-            self._fuzz_ops.append(op)
+    def _insertPosEff(self, action : Action) -> None:
+        atoms = self._getAtomsForInsertion(
+                False, action)
+        atom = random.choice(atoms)
+        self._insertEff(action, atom)
 
-    def fuzz(self, k = 1):
-        ops = [self._fuzz_prec, self._fuzz_pos_effs, self._fuzz_neg_effs]
+    def _insertNegEff(self, action : Action) -> None:
+        atoms = self._getAtomsForInsertion(
+                True, action)
+        atom = random.choice(atoms)
+        self._insertEff(action, atom)
+
+    def _deleteEff(
+            self, 
+            action : Action, 
+            atom : Atom) -> None:
+        op = EffDeletion(action, atom)
+        op.apply()
+        self._ops.append(op)
+    
+    def _deletePosEff(self, action : Action) -> None:
+        atoms = [eff.literal for eff in action.effects]
+        atoms = filter(
+                lambda x : not x.negated,
+                atoms)
+        atom = random.choice(atoms)
+        self._deleteEff(action, atom)
+
+    def _deleteNegEff(self, action : Action) -> None:
+        atoms = [eff.literal for eff in action.effects]
+        atoms = filter(
+                lambda x : x.negated,
+                atoms)
+        atom = random.choice(atoms)
+        self._deleteEff(action, atom)
+
+    def _insertPrecond(
+            self, 
+            action : Action, 
+            atom : Atom) -> None:
+        op = PrecondInsertion(action, atom)
+        op.apply()
+        self._ops.append(op)
+
+    def _insertPosPrecond(
+            self,
+            action : Action) -> None:
+        atoms = self._getAtomsForInsertion(
+                False, action)
+        atom = random.choice(atoms)
+        self._insertPrecond(action, atom)
+    
+    def _insertNegPrecond(
+            self,
+            action : Action) -> None:
+        atoms = self._getAtomsForInsertion(
+                True, action)
+        atom = random.choice(atoms)
+        self._insertPrecond(action, atom)
+    
+    def _fuzz(self, k = 1):
+        if self.hasNegPrecond:
+            ops = [self._insertPosPrecond,
+                   self._insertNegPrecond,
+                   self._insertPosEff,
+                   self._insertNegEff,
+                   self._deletePosEff,
+                   self._deleteNegEff]
+        else:
+            ops = [self._insertPosPrecond,
+                   self._insertNegEff,
+                   self._deletePosEff]
         actions = random.sample(self.task.actions, k)
         for action in actions:
             op = random.choice(ops)
             op(action)
-    
-    def write_domain(self, output_dir):
-        with open(os.path.join(output_dir, "domain.pddl"), "w") as f:
-            f.write(self.task.domain())
 
-    def write_ops(self, output_dir):
-        with open(os.path.join(output_dir, "fuzz_ops.txt"), "w") as f:
-            for op in self._fuzz_ops:
+    def _validated(self) -> bool:
+        illegalFeatures = [
+                ":negative-preconditions", 
+                ":disjunctive-preconditions",
+                ":existential-preconditions", 
+                ":universal-preconditions", 
+                ":quantified-preconditions",
+                ":conditional-effects", 
+                ":derived-predicates"]
+        reqs = self.task.requirements.requirements
+        unsupport = filter(
+                lambda x : x in illegalFeatures,
+                reqs)
+        if len(unsupport) > 0:
+            return False
+        for a in self.task.actions:
+            if isinstance(a.precondition, Atom):
+                continue 
+            if isinstance(a.precondition, NegatedAtom):
+                self.hasNegPrecond = True
+                continue
+            if isinstance(a.precondition, Conjunction):
+                atoms = a.precondition.parts
+                for atom in atoms:
+                    if isinstance(atom, Atom):
+                        continue
+                    if isinstance(atom, NegatedAtom):
+                        self.hasNegPrecond = True
+                        continue
+                    return False
+                continue
+            return False
+        return True
+    
+    def writeDomain(self, outDir):
+        outFile = os.path.join(
+                outDir, "domain.pddl")
+        with open(outFile, "w") as f:
+            f.write(self.task.domain())
+    
+    def writeOperations(self, outDir):
+        outFile = os.path.join(
+                outDir, "fuzz_ops.txt")
+        with open(outFile, "w") as f:
+            for op in self._ops:
                 f.write("{}\n".format(op))
 
-class FuzzerNegPrec(Fuzzer):
-    def _filter_preds_pos(self, action, atoms):
-        pos_atoms = [eff.literal for eff in action.effects if not eff.literal.negated]
-        r = []
-        for a in atoms:
-            if a not in pos_atoms:
-                r.append(a)
-        return r
-
-    def _fuzz_prec_neg(self, action):
-        atoms = self._matched_atoms(action)
-        atom = random.choice(atoms)
-        op = FuzzPrec(action, atom.negate())
-        op.apply()
-        self._fuzz_ops.append(op)
-    
-    def _fuzz_neg_effs_del(self, action):
-        atoms = [eff.literal for eff in action.effects if eff.literal.negated]
-        if len(atoms) != 0:
-            atom = random.choice(atoms)
-            op = FuzzDelEff(action, atom)
-            op.apply()
-            self._fuzz_ops.append(op)
-
-    def _fuzz_pos_effs_add(self, action):
-        atoms = self._matched_atoms(action)
-        atoms = self._filter_preds_pos(action, atoms)
-        atom = random.choice(atoms)
-        op = FuzzAddEff(action, atom)
-        op.apply()
-        self._fuzz_ops.append(op)
-
-    def fuzz(self, k = 1):
-        ops = [self._fuzz_prec, self._fuzz_pos_effs, self._fuzz_pos_effs_add, self._fuzz_neg_effs, self._fuzz_neg_effs_del]
-        actions = random.sample(self.task.actions, k)
-        for action in actions:
-            op = random.choices(population=ops, weights=[0.1, 0.2, 0.5, 0.1, 0.1], k=1)
-            op[0](action)
-
 if __name__ == "__main__":
-    domain_file = "/home/users/u6162630/Datasets/downward-benchmarks/woodworking-opt11-strips/domain.pddl"
-    task_file = "/home/users/u6162630/Datasets/downward-benchmarks/woodworking-opt11-strips/p01.pddl"
-    fuzzer = Fuzzer(domain_file, task_file)
-    fuzzer.fuzz(3)
+    raise NotImplementedError
