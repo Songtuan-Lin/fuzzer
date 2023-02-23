@@ -1,7 +1,9 @@
 import os
 import random
+from options import setup
 from util import getAllTuples
 from typing import List
+from domain import Domain
 from operations import EffInsertion
 from operations import EffDeletion
 from operations import PrecondInsertion
@@ -14,10 +16,8 @@ from fd.pddl.conditions import Conjunction
 class Fuzzer:
     def __init__(
             self, k : int,
-            domainFile : str,
-            taskFile : str) -> None:
-        self.task = pddl_file.open(
-                taskFile, domainFile)
+            domainFile : str) -> None:
+        self.domain = Domain(domainFile)
         self.hasNegPrecond = False
         if not self._validated():
             raise InvalidDomainError
@@ -36,9 +36,9 @@ class Fuzzer:
         existingAtoms = self._fetch(negated)(atoms)
         atoms = self._getAtomsMatchingAction(
                 negated, action)
-        atoms = filter(
+        atoms = list(filter(
                 self._filter(existingAtoms),
-                atoms)
+                atoms))
         return atoms
 
     def _getMatchedVars(self, arg, action):
@@ -64,7 +64,7 @@ class Fuzzer:
             negated : bool, 
             action : Action) -> List[Atom]:
         atoms = []
-        for predicate in self.task.predicates:
+        for predicate in self.domain.predicates:
             args = self._getArguments(predicate, action)
             if args is None:
                 continue
@@ -112,17 +112,17 @@ class Fuzzer:
     
     def _deletePosEff(self, action : Action) -> None:
         atoms = [eff.literal for eff in action.effects]
-        atoms = filter(
+        atoms = list(filter(
                 lambda x : not x.negated,
-                atoms)
+                atoms))
         atom = random.choice(atoms)
         self._deleteEff(action, atom)
 
     def _deleteNegEff(self, action : Action) -> None:
         atoms = [eff.literal for eff in action.effects]
-        atoms = filter(
+        atoms = list(filter(
                 lambda x : x.negated,
-                atoms)
+                atoms))
         atom = random.choice(atoms)
         self._deleteEff(action, atom)
 
@@ -162,7 +162,7 @@ class Fuzzer:
             ops = [self._insertPosPrecond,
                    self._insertNegEff,
                    self._deletePosEff]
-        actions = random.sample(self.task.actions, k)
+        actions = random.sample(self.domain.actions, k)
         for action in actions:
             op = random.choice(ops)
             op(action)
@@ -176,13 +176,13 @@ class Fuzzer:
                 ":quantified-preconditions",
                 ":conditional-effects", 
                 ":derived-predicates"]
-        reqs = self.task.requirements.requirements
-        unsupport = filter(
+        reqs = self.domain.requirements.requirements
+        unsupport = list(filter(
                 lambda x : x in illegalFeatures,
-                reqs)
+                reqs))
         if len(unsupport) > 0:
             return False
-        for a in self.task.actions:
+        for a in self.domain.actions:
             if isinstance(a.precondition, Atom):
                 continue 
             if isinstance(a.precondition, NegatedAtom):
@@ -205,7 +205,7 @@ class Fuzzer:
         outFile = os.path.join(
                 outDir, "domain.pddl")
         with open(outFile, "w") as f:
-            f.write(self.task.domain())
+            f.write(self.domain.domain())
     
     def writeOperations(self, outDir):
         outFile = os.path.join(
@@ -215,4 +215,10 @@ class Fuzzer:
                 f.write("{}\n".format(op))
 
 if __name__ == "__main__":
-    raise NotImplementedError
+    args = setup()
+    fuzzer = Fuzzer(args.num, args.domain)
+    if args.outDomain is not None:
+        fuzzer.writeDomain(args.outDomain)
+    if args.outOperations is not None:
+        fuzzer.writeOperations(args.outOperations)
+    

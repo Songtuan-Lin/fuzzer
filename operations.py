@@ -42,7 +42,7 @@ class EffInsertion(Operation):
 
     def apply(self) -> None:
         action_args = set()
-        for p in self.action.parameter:
+        for p in self.action.parameters:
             action_args.add(p.name)
         for arg in self.atom.args:
             if arg not in action_args:
