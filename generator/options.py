@@ -20,6 +20,9 @@ def setup():
                 "-n", "--numCPUs", type=int,
                 help="number of CPUs to be used")
     parser.add_argument(
+            "--fuzzer", type=str,
+            help="path to the fuzzer")
+    parser.add_argument(
             "--benchmarks", required=True,
             help="the directory of the benchmarks")
     parser.add_argument(
@@ -36,3 +39,4 @@ def setup():
     parser.add_argument(
             "--downward", type=str,
             help="path to Fast-downward")
+    return parser.parse_args()

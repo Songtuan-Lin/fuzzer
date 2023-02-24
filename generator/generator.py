@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 import subprocess
+import options
 from subprocess import CalledProcessError
 import multiprocessing
 
@@ -15,11 +16,13 @@ class Generator:
         self._instances = []
         self._args = args
         benchmarkDir = self._args.benchmarks
+        if os.path.exists("err-log"):
+            subprocess.run(["rm", "err-log"])
         loggingFormat = ("{asctime:s} - "
                          "{funcName:s} - " 
                          "{message:s}")
         logging.basicConfig(
-                filename="log",
+                filename="err-log",
                 style="{",
                 format=loggingFormat)
         self._logger = logging.getLogger(__name__)
@@ -38,6 +41,10 @@ class Generator:
             taskFiles = list(filter(
                     lambda x : "domain" not in x,
                     files))
+            taskFiles = list(map(
+                    lambda x : os.path.join(
+                            domainDir, x),
+                    taskFiles))
             if not len(domainFiles):
                 msg = ("No domain file in {}").format(
                         domainDir)
@@ -46,7 +53,10 @@ class Generator:
                 msg = ("More than one domain file"
                        " in {}".format(domainDir))
                 self._logger.warning(msg)
+                continue
             domainFile = domainFiles.pop()
+            domainFile = os.path.join(
+                    domainDir, domainFile)
             self._instances.append(
                     (domain, domainFile, taskFiles))
         self._tasks = list()
@@ -89,13 +99,15 @@ class Generator:
                 outFileDir = "err-rate-{}".format(rate)
                 outFileDir = os.path.join(
                         outTaskDir, outFileDir)
+                if not os.path.exists(outFileDir):
+                    os.mkdir(outFileDir)
                 pathFuzzer = "../fuzzer.py"
                 if self._args.fuzzer is not None:
                     pathFuzzer = self._args.fuzzer
                 cmd = [sys.executable, 
                        pathFuzzer,
                        "--rate",
-                       rate,
+                       str(rate),
                        "--domain",
                        domainFile,
                        "--outDomain",
@@ -123,13 +135,15 @@ class Generator:
             outFileDir = "err-rate-{}".format(rate)
             outFileDir = os.path.join(
                     outDomainDir, outFileDir)
+            if not os.path.exists(outFileDir):
+                os.mkdir(outFileDir)
             pathFuzzer = "../fuzzer.py"
             if self._args.fuzzer is not None:
                     pathFuzzer = self._args.fuzzer
             cmd = [sys.executable, 
                     pathFuzzer,
                     "--rate",
-                    rate,
+                    str(rate),
                     "--domain",
                     domainFile,
                     "--outDomain",
@@ -161,7 +175,7 @@ class Generator:
             instance : Tuple[str, str, List[str]]) -> None:
         domain, _, _ = instance
         outDomainDir = os.path.join(
-                self._args.outDir, domain)
+                self._args.out, domain)
         if not os.path.exists(outDomainDir):
             os.mkdir(outDomainDir)
         if self._args.single:
@@ -173,6 +187,10 @@ class Generator:
             self, 
             task : Tuple[str, str, str]) -> bool:
         domainFile, taskFile, outDir = task
+        planFile = os.path.join(
+                outDir, "sas_plan")
+        sasFile = os.path.join(
+                outDir, "output.sas")
         cmd = [sys.executable, 
                self._args.downward, 
                "--alias", 
@@ -180,10 +198,13 @@ class Generator:
                "--overall-time-limit", 
                "900", 
                "--plan-file", 
-               outDir, 
+               planFile, 
+               "--sas-file",
+               sasFile,
                domainFile, 
                taskFile]
-        proc = subprocess.run(cmd)
+        proc = subprocess.run(
+                cmd, capture_output=True)
         try:
             proc.check_returncode()
         except CalledProcessError as err:
@@ -193,7 +214,7 @@ class Generator:
             return False
         return True
 
-    def _start(self) -> None:
+    def start(self) -> None:
         print("- Generating corrupted domains")
         if self._args.single:
             print("- Each domain is paried with one task")
@@ -216,3 +237,7 @@ class Generator:
                           total=len(self._tasks)))
         print("- Done!")
 
+if __name__ == "__main__":
+    args = options.setup()
+    generator = Generator(args)
+    generator.start()
