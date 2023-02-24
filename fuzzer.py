@@ -1,5 +1,6 @@
 import os
 import random
+import math
 from options import setup
 from util import getAllTuples
 from typing import List, Union
@@ -8,14 +9,13 @@ from operations import EffInsertion
 from operations import EffDeletion
 from operations import PrecondInsertion
 from operations import InvalidDomainError
-from fd.pddl import pddl_file
 from fd.pddl.actions import Action
 from fd.pddl.conditions import Atom, NegatedAtom
 from fd.pddl.conditions import Conjunction
 
 class Fuzzer:
     def __init__(
-            self, k : int,
+            self, rate : float,
             domainFile : str) -> None:
         self.domain = Domain(domainFile)
         self.hasNegPrecond = False
@@ -27,7 +27,8 @@ class Fuzzer:
                     list(filter(lambda y : y.negated == negated, 
                                 xs)))
         self._filter = lambda xs : lambda x : x not in xs
-        self._fuzz(k)
+        numErrors = math.ceil(len(self.domain.actions) * rate)
+        self._fuzz(numErrors)
     
     def _getAtomsForInsertion(
             self, negated : bool, 
@@ -216,7 +217,7 @@ class Fuzzer:
 
 if __name__ == "__main__":
     args = setup()
-    fuzzer = Fuzzer(args.num, args.domain)
+    fuzzer = Fuzzer(args.rate, args.domain)
     if args.outDomain is not None:
         fuzzer.writeDomain(args.outDomain)
     if args.outOperations is not None:
