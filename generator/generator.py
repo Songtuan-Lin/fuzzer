@@ -102,17 +102,14 @@ class Generator:
                        outFileDir,
                        "--outOperations",
                        outFileDir]
-                proc = subprocess.Popen(
-                        cmd, text=True,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE)
-                _, errs = proc.communicate()
-                if proc.returncode:
+                proc = subprocess.run(
+                    cmd, capture_output=True)
+                try:
+                    proc.check_returncode()
+                except CalledProcessError as err:
                     msg = "{} - {}".format(
-                            domainFile, errs)
-                    self._logger.error(
-                            msg,
-                            exc_info=True)
+                            err.cmd, err.output)
+                    self._logger.error(msg)
             self._tasks.append(
                     (domainFile, taskFile, outTaskDir))
 
@@ -141,17 +138,12 @@ class Generator:
                     outFileDir]
             proc = subprocess.run(
                     cmd, capture_output=True)
-            proc = subprocess.Popen(
-                    cmd, text=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE)
-            _, errs = proc.communicate()
-            if proc.returncode:
-                    msg = "{} - {}".format(
-                            domainFile, errs)
-                    self._logger.error(
-                            msg,
-                            exc_info=True)
+            try:
+                proc.check_returncode()
+            except CalledProcessError as err:
+                msg = "{} - {}".format(
+                        err.cmd, err.output)
+                self._logger.error(msg)
         for taskFile in taskFiles:
             taskName = os.path.basename(taskFile)
             taskName = taskName.split(".")[0]
@@ -177,7 +169,9 @@ class Generator:
         if self._args.multiple:
             self._batch(instance)
 
-    def _solve(self, task):
+    def _solve(
+            self, 
+            task : Tuple[str, str, str]) -> bool:
         domainFile, taskFile, outDir = task
         cmd = [sys.executable, 
                self._args.downward, 
@@ -196,8 +190,15 @@ class Generator:
             msg = "{} - {}".format(
                     err.cmd, err.output)
             self._logger.error(msg)
+            return False
+        return True
 
     def _start(self) -> None:
+        print("- Generating corrupted domains")
+        if self._args.single:
+            print("- Each domain is paried with one task")
+        if self._args.multiple:
+            print("- Each domain is paired with multiple tasks")
         for instance in tqdm(self._instances):
             self._run(instance)
         if not self._args.solve:
@@ -210,4 +211,8 @@ class Generator:
         if self._args.numCPUs is not None:
             numCPUs = self._args.numCPUs
         print("- Using {} CPUs".format(numCPUs))
+        with multiprocessing.Pool(numCPUs) as p:
+            _ = list(tqdm(p.imap(self._solve, self._tasks), 
+                          total=len(self._tasks)))
+        print("- Done!")
 
