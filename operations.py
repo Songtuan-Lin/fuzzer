@@ -32,7 +32,7 @@ class Operation:
 
 class EffInsertion(Operation):
     def __str__(self) -> str:
-        msg = "<Add {} to Effs: {}>".format(
+        msg = "Add {} to Effects: {}".format(
                 self.atom, 
                 self.action.name)
         return msg
@@ -54,7 +54,7 @@ class EffInsertion(Operation):
 
 class EffDeletion(Operation):
     def __str__(self) -> str:
-        msg = "<Remove {} from Effs: {}>".format(
+        msg = "Delete {} from Effects: {}>".format(
                 self.atom, self.action.name)
         return msg
     
@@ -76,7 +76,7 @@ class EffDeletion(Operation):
 
 class PrecondInsertion(Operation):
     def __str__(self) -> str:
-        msg = "<Add {} to Prec: {}>".format(
+        msg = "Add {} to Precondition: {}".format(
                 self.atom, self.action.name)
         return msg
     
@@ -96,3 +96,29 @@ class PrecondInsertion(Operation):
         new_prec = [a for a in atoms]
         new_prec.append(self.atom)
         self.action.precondition = Conjunction(new_prec)
+
+class PrecondDeletion(Operation):
+    def __str__(self) -> str:
+        msg = "Delete {} from Precondition: {}".format(
+                self.atom, self.action.name)
+        return msg
+
+    def __repr__(self):
+        return str(self)
+
+    def apply(self) -> None:
+        pop_idx = -1
+        atoms = (self.action.precondition,)
+        if isinstance(self.action.precondition, Conjunction):
+            atoms = self.action.precondition.parts
+        atoms = list(atoms)
+        for idx, atom in atoms:
+            if atom == self.atom:
+                pop_idx = idx
+                break
+        if pop_idx == -1:
+            msg = "Invalid precondition: {} in {}".format(
+                    self.atom, self.action.name)
+            raise InvalidOperationError(msg)
+        atoms.pop(pop_idx)
+        self.action.precondition = Conjunction(atoms)
