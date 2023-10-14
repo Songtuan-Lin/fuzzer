@@ -4,3 +4,4 @@ __pycache__
 *.sas
 err-log
 .vscode/
+.idea/
