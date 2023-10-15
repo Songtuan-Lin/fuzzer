@@ -6,10 +6,6 @@ from util import getAllTuples
 from typing import List, Union
 from domain import Domain
 from operations import *
-# from operations import EffInsertion
-# from operations import EffDeletion
-# from operations import PrecondInsertion
-# from operations import InvalidDomainError
 from fd.pddl.actions import Action
 from fd.pddl.conditions import Atom, NegatedAtom
 from fd.pddl.conditions import Conjunction
@@ -31,6 +27,7 @@ class Fuzzer:
         self._filter = lambda xs: lambda x: x not in xs
         num_errors = math.ceil(len(self.domain.actions) * rate)
         self._fuzz(num_errors)
+        self._relax(num_errors)
 
     def _getAtomsForInsertion(
             self, negated: bool,
@@ -221,16 +218,16 @@ class Fuzzer:
             return False
         return True
 
-    def writeDomain(self, outDir):
-        outFile = os.path.join(
-            outDir, "domain.pddl")
-        with open(outFile, "w") as f:
+    def writeDomain(self, out_dir):
+        out_file = os.path.join(
+            out_dir, "domain.pddl")
+        with open(out_file, "w") as f:
             f.write(self.domain.domain())
 
-    def writeOperations(self, outDir):
-        outFile = os.path.join(
-            outDir, "fuzz_ops.txt")
-        with open(outFile, "w") as f:
+    def writeOperations(self, out_dir):
+        out_file = os.path.join(
+            out_dir, "fuzz_ops.txt")
+        with open(out_file, "w") as f:
             for op in self._ops:
                 f.write("{}\n".format(op))
 

@@ -10,42 +10,42 @@ from fd.pddl.tasks import *
 class Transformer:
     def __init__(
             self,
-            origin: Domain,
-            modified: Domain):
+            dx: Domain,
+            dy: Domain):
         self._pred_mapping = dict()
         action_mapping = dict()
-        for action in modified.actions:
-            for a in origin.actions:
-                if action.name == a.name:
-                    action_mapping[action] = a
-        for pred in modified.predicates:
+        for y_action in dy.actions:
+            for a in dx.actions:
+                if y_action.name == a.name:
+                    action_mapping[y_action] = a
+        for pred in dy.predicates:
             self._pred_mapping[pred.name] = Predicate(
                     pred.name+"-copy",
                     pred.arguments)
         extended_preds = list(self._pred_mapping.values())
         extended_preds.append(Predicate("invalid", []))
-        unlock_atom = Atom("unlock-origin-domain", [])
-        extended_preds.append(Predicate(unlock_atom.predicate, unlock_atom.args))
+        x_atom = Atom("unlock-origin-domain", [])
+        extended_preds.append(Predicate(x_atom.predicate, x_atom.args))
         extended_actions = list()
-        for action in modified.actions:
-            origin_action = action_mapping[action]
-            lock_atom = Atom(action.name+"-lock", action.parameters)
-            extended_preds.append(Predicate(lock_atom.predicate, lock_atom.args))
-            new_eff = Effect([], Truth(), lock_atom)
-            origin_action.effects.append(new_eff)
-            new_eff = Effect([], Truth(), unlock_atom.negate())
-            origin_action.effects.append(new_eff)
-            origin_prec = (origin_action.precondition,)
-            if isinstance(origin_action.precondition, Conjunction):
-                origin_prec = origin_action.precondition.parts
-            origin_prec = list(origin_prec)
-            origin_prec.append(unlock_atom)
-            origin_action.precondition = Conjunction(origin_prec)
-            atoms = (action.precondition,)
-            if isinstance(action.precondition, Conjunction):
-                atoms = action.precondition.parts
+        for y_action in dy.actions:
+            x_action = action_mapping[y_action]
+            y_atom = Atom(y_action.name+"-lock", y_action.parameters)
+            extended_preds.append(Predicate(y_atom.predicate, y_atom.args))
+            new_eff = Effect([], Truth(), y_atom)
+            x_action.effects.append(new_eff)
+            new_eff = Effect([], Truth(), x_atom.negate())
+            x_action.effects.append(new_eff)
+            x_prec = (x_action.precondition,)
+            if isinstance(x_action.precondition, Conjunction):
+                x_prec = x_action.precondition.parts
+            x_prec = list(x_prec)
+            x_prec.append(x_atom)
+            x_action.precondition = Conjunction(x_prec)
+            atoms = (y_action.precondition,)
+            if isinstance(y_action.precondition, Conjunction):
+                atoms = y_action.precondition.parts
             atoms = list(atoms)
-            new_prec = [lock_atom]
+            new_prec = [y_atom]
             for idx, atom in enumerate(atoms):
                 name = self._pred_mapping[atom.predicate].name
                 new_atom = Atom(name, list(atom.args))
@@ -58,18 +58,18 @@ class Transformer:
                 # TODO: add unique precondition that can only be satisfied by the corresponding effect of
                 # the action in the original domain
                 invalidation = Action(
-                        action.name + "-stop-{}".format(idx),
-                        action.parameters,
-                        action.num_external_parameters,
-                        Conjunction([negation, lock_atom]),
+                        y_action.name + "-stop-{}".format(idx),
+                        y_action.parameters,
+                        y_action.num_external_parameters,
+                        Conjunction([negation, y_atom]),
                         [Effect([], Truth(), Atom("invalid", []))],
-                        action.cost)
+                        y_action.cost)
                 extended_actions.append(invalidation)
             new_prec = Conjunction(new_prec)
-            new_effs = [lock_atom.negate(), unlock_atom]
-            for eff in action.effects:
+            new_effs = [y_atom.negate(), x_atom]
+            for eff in y_action.effects:
                 atom = eff.literal
-                if atom == lock_atom or atom == unlock_atom.negate():
+                if atom == y_atom or atom == x_atom.negate():
                     continue
                 name = self._pred_mapping[atom.predicate].name
                 new_atom = Atom(name, list(atom.args))
@@ -77,26 +77,26 @@ class Transformer:
                     new_atom = new_atom.negate()
                 new_effs.append(Effect([], Truth(), new_atom))
             new_action = Action(
-                    action.name + "-copy",
-                    action.parameters,
-                    action.num_external_parameters,
-                    new_prec, new_effs, action.cost)
+                    y_action.name + "-copy",
+                    y_action.parameters,
+                    y_action.num_external_parameters,
+                    new_prec, new_effs, y_action.cost)
             extended_actions.append(new_action)
         turn_action = Action(
                 "turning", [],
                 0,
                 Conjunction([Atom("invalid", [])]),
-                [Effect([], Truth(), unlock_atom)],
-                origin.actions[-1].cost)
+                [Effect([], Truth(), x_atom)],
+                dx.actions[-1].cost)
         extended_actions.append(turn_action)
-        self._domain_name = origin.domain_name
-        self._requirements = origin.requirements
-        self._types = origin.types
-        self._constants = origin.constants
-        self._actions = origin.actions + extended_actions
-        self._predicates = origin.predicates + extended_preds
-        self._functions = origin.functions
-        self._axioms = origin.axioms
+        self._domain_name = dx.domain_name
+        self._requirements = dx.requirements
+        self._types = dx.types
+        self._constants = dx.constants
+        self._actions = dx.actions + extended_actions
+        self._predicates = dx.predicates + extended_preds
+        self._functions = dx.functions
+        self._axioms = dx.axioms
 
     def output_task(self, task_file, path):
         parsed_file = parse_pddl_file(
