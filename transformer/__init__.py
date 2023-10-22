@@ -1,3 +1,5 @@
+import os.path
+
 from domain import Domain
 from fd.pddl.predicates import *
 from fd.pddl.actions import *
@@ -5,6 +7,8 @@ from fd.pddl.conditions import *
 from fd.pddl.effects import *
 from fd.pddl.pddl_file import parse_pddl_file
 from fd.pddl.tasks import *
+
+import argparse
 
 
 class Transformer:
@@ -55,8 +59,6 @@ class Transformer:
                 else:
                     new_prec.append(new_atom.negate())
                     negation = new_atom
-                # TODO: add unique precondition that can only be satisfied by the corresponding effect of
-                # the action in the original domain
                 invalidation = Action(
                         y_action.name + "-stop-{}".format(idx),
                         y_action.parameters,
@@ -111,8 +113,11 @@ class Transformer:
         goal = Conjunction(goal)
         extension = [Atom("unlock-origin-domain", [])]
         for atom in init:
-            extension.append(
-                    Atom(self._pred_mapping[atom.predicate].name, atom.args))
+            if not isinstance(atom, Atom):
+                extension.append(atom)
+            else:
+                extension.append(
+                        Atom(self._pred_mapping[atom.predicate].name, atom.args))
         init = init + extension
         metric = ""
         objects = set(objects) - set(self._constants)
@@ -128,7 +133,7 @@ class Transformer:
                                          goal.pddl(), metric=metric,
                                          problem=task_name,
                                          domain_name=self._domain_name)
-        with open(path, "w") as f:
+        with open(os.path.join(path, "task.pddl"), "w") as f:
             f.write(body)
 
     def output_domain(self, path):
@@ -146,17 +151,39 @@ class Transformer:
                     constants=' '.join(x.pddl() for x in self._constants),
                     domain_name=self._domain_name,
                     requirements=self._requirements.pddl())
-        with open(path, "w") as f:
+        with open(os.path.join(path, "domain.pddl"), "w") as f:
             f.write(body)
 
 
+parser = argparse.ArgumentParser()
+parser.add_argument(
+        "--origin", type=str,
+        help="path to the original domain file")
+parser.add_argument(
+        "--modified", type=str,
+        help="path to the modified domain file")
+parser.add_argument(
+        "--task", type=str,
+        help="path to the task file")
+parser.add_argument(
+        "--pos_dir", type=str,
+        help="path to the directory for producing positive plans")
+parser.add_argument(
+        "--neg_dir", type=str,
+        help="path to the directory for producing negative plans")
 
 if __name__ == "__main__":
-    domain_file_1 = "test/domain.pddl"
-    domain_file_2 = "test/domain-2.pddl"
-    task_file = "test/task.pddl"
-    first = Domain(domain_file_1)
-    second = Domain(domain_file_2)
-    t = Transformer(first, second)
-    t.output_domain("domain-new.pddl")
-    t.output_task(task_file, "task-new.pddl")
+    args = parser.parse_args()
+    dx = Domain(args.origin)
+    dy = Domain(args.modified)
+    tp = Transformer(dx, dy)
+    # tn = Transformer(dy, dx)
+    tp.output_domain(args.pos_dir)
+    tp.output_task(args.task, args.pos_dir)
+    # tn.output_domain(args.neg_dir)
+    # tn.output_task(args.task, args.neg_dir)
+    dx = Domain(args.modified)
+    dy = Domain(args.origin)
+    tn = Transformer(dx, dy)
+    tn.output_domain(args.neg_dir)
+    tn.output_task(args.task, args.neg_dir)

@@ -26,7 +26,7 @@ class Fuzzer:
                         xs)))
         self._filter = lambda xs: lambda x: x not in xs
         num_errors = math.ceil(len(self.domain.actions) * rate)
-        self._fuzz(num_errors)
+        # self._fuzz(num_errors)
         self._relax(num_errors)
 
     def _getAtomsForInsertion(
@@ -39,6 +39,9 @@ class Fuzzer:
         atoms = list(filter(
             self._filter(existingAtoms),
             atoms))
+        atoms = list(filter(
+                lambda x: x.predicate != "=",
+                atoms))
         return atoms
 
     def _getMatchedVars(self, arg, action):
@@ -80,6 +83,9 @@ class Fuzzer:
             for t in combinations:
                 atom = constructor(predicate.name)(t)
                 atoms.append(atom)
+            atoms = list(filter(
+                lambda x: x.predicate != "=",
+                atoms))
         return atoms
 
     def _insertEff(
@@ -152,15 +158,25 @@ class Fuzzer:
 
     def _deletePrecond(
             self,
-            action: Action) -> None:
+            action: Action) -> bool:
         atoms = (action.precondition,)
         if isinstance(action.precondition, Conjunction):
             atoms = action.precondition.parts
         atoms = list(atoms)
-        atom = random.choice(atoms)
+        candidates = []
+        for atom in atoms:
+            for a in self.domain.actions:
+                effs = {e.literal for e in a.effects}
+                if atom in effs:
+                    candidates.append(atom)
+                    break
+        if len(candidates) == 0:
+            return False
+        atom = random.choice(candidates)
         op = PrecondDeletion(action, atom)
         op.apply()
         self._ops.append(op)
+        return True
 
     def _fuzz(self, k=1):
         if self.has_neg_prec:
@@ -180,9 +196,18 @@ class Fuzzer:
             op(action)
 
     def _relax(self, k=1):
-        actions = random.sample(self.domain.actions, k)
-        for action in actions:
-            self._deletePrecond(action)
+        count = 0
+        while True:
+            action = random.choice(self.domain.actions)
+            if self._deletePrecond(action):
+                count += 1
+            if count == k:
+                break
+        # ops = [self._deleteNegEff, self._deletePrecond]
+        # actions = random.sample(self.domain.actions, k)
+        # for action in actions:
+        #     op = random.choice(ops)
+        #     op(action)
 
     def _validated(self) -> bool:
         illegalFeatures = [

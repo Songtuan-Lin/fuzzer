@@ -54,7 +54,7 @@ class EffInsertion(Operation):
 
 class EffDeletion(Operation):
     def __str__(self) -> str:
-        msg = "Delete {} from Effects: {}>".format(
+        msg = "Delete {} from Effects: {}".format(
                 self.atom, self.action.name)
         return msg
     
@@ -112,7 +112,7 @@ class PrecondDeletion(Operation):
         if isinstance(self.action.precondition, Conjunction):
             atoms = self.action.precondition.parts
         atoms = list(atoms)
-        for idx, atom in atoms:
+        for idx, atom in enumerate(atoms):
             if atom == self.atom:
                 pop_idx = idx
                 break
