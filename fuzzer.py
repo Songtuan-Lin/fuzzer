@@ -13,7 +13,8 @@ from fd.pddl.conditions import Conjunction
 
 class Fuzzer:
     def __init__(
-            self, rate: float,
+            self, restrict_rate: float,
+            relax_rate: float,
             domain_file: str) -> None:
         self.domain = Domain(domain_file)
         self.has_neg_prec = False
@@ -25,8 +26,9 @@ class Fuzzer:
             list(filter(lambda y: y.negated == negated,
                         xs)))
         self._filter = lambda xs: lambda x: x not in xs
-        num_errors = math.ceil(len(self.domain.actions) * rate)
-        # self._fuzz(num_errors)
+        num_errors = math.ceil(len(self.domain.actions) * restrict_rate)
+        self._fuzz(num_errors)
+        num_errors = math.ceil(len(self.domain.actions) * relax_rate)
         self._relax(num_errors)
 
     def _getAtomsForInsertion(
