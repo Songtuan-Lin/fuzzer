@@ -13,7 +13,7 @@ from fd.pddl.conditions import Conjunction
 
 class Fuzzer:
     def __init__(
-            self, restrict_rate: float,
+            self, harden_rate: float,
             relax_rate: float,
             domain_file: str) -> None:
         self.domain = Domain(domain_file)
@@ -26,51 +26,51 @@ class Fuzzer:
             list(filter(lambda y: y.negated == negated,
                         xs)))
         self._filter = lambda xs: lambda x: x not in xs
-        num_errors = math.ceil(len(self.domain.actions) * restrict_rate)
-        self._fuzz(num_errors)
+        num_errors = math.ceil(len(self.domain.actions) * harden_rate)
+        self._harden(num_errors)
         num_errors = math.ceil(len(self.domain.actions) * relax_rate)
         self._relax(num_errors)
 
-    def _getAtomsForInsertion(
+    def _atoms_for_insertion(
             self, negated: bool,
             action: Action) -> List[Atom]:
         atoms = [eff.literal for eff in action.effects]
-        existingAtoms = self._fetch(negated)(atoms)
-        atoms = self._getAtomsMatchingAction(
+        existing = self._fetch(negated)(atoms)
+        atoms = self._atoms_matching_action(
             negated, action)
         atoms = list(filter(
-            self._filter(existingAtoms),
+            self._filter(existing),
             atoms))
         atoms = list(filter(
                 lambda x: x.predicate != "=",
                 atoms))
         return atoms
 
-    def _getMatchedVars(self, arg, action):
-        vars = [para for para in action.parameters]
-        vars = filter(
+    def _matching_vars(self, arg, action):
+        variables = [para for para in action.parameters]
+        variables = filter(
             lambda v: v.type == arg.type,
-            vars)
-        vars = [v.name for v in vars]
-        return vars
+            variables)
+        variables = [v.name for v in variables]
+        return variables
 
-    def _getArguments(self, predicate, action):
-        args = list()
+    def _parameters(self, predicate, action):
+        parameters = list()
         for arg in predicate.arguments:
-            vars = self._getMatchedVars(
+            variables = self._matching_vars(
                 arg, action)
-            if not len(vars):
+            if not len(variables):
                 return None
-            args.append(vars)
-        return args
+            parameters.append(variables)
+        return parameters
 
-    def _getAtomsMatchingAction(
+    def _atoms_matching_action(
             self,
             negated: bool,
             action: Action) -> List[Union[Atom, NegatedAtom]]:
         atoms = []
         for predicate in self.domain.predicates:
-            args = self._getArguments(predicate, action)
+            args = self._parameters(predicate, action)
             if args is None:
                 continue
             combinations = getAllTuples(args)
@@ -90,7 +90,7 @@ class Fuzzer:
                 atoms))
         return atoms
 
-    def _insertEff(
+    def _insert_eff(
             self,
             action: Action,
             atom: Atom) -> None:
@@ -98,19 +98,19 @@ class Fuzzer:
         op.apply()
         self._ops.append(op)
 
-    def _insertPosEff(self, action: Action) -> None:
-        atoms = self._getAtomsForInsertion(
+    def _insert_pos_eff(self, action: Action) -> None:
+        atoms = self._atoms_for_insertion(
             False, action)
         atom = random.choice(atoms)
-        self._insertEff(action, atom)
+        self._insert_eff(action, atom)
 
-    def _insertNegEff(self, action: Action) -> None:
-        atoms = self._getAtomsForInsertion(
+    def _insert_neg_eff(self, action: Action) -> None:
+        atoms = self._atoms_for_insertion(
             True, action)
         atom = random.choice(atoms)
-        self._insertEff(action, atom)
+        self._insert_eff(action, atom)
 
-    def _deleteEff(
+    def _delete_eff(
             self,
             action: Action,
             atom: Atom) -> None:
@@ -118,23 +118,23 @@ class Fuzzer:
         op.apply()
         self._ops.append(op)
 
-    def _deletePosEff(self, action: Action) -> None:
+    def _delete_pos_eff(self, action: Action) -> None:
         atoms = [eff.literal for eff in action.effects]
         atoms = list(filter(
             lambda x: not x.negated,
             atoms))
         atom = random.choice(atoms)
-        self._deleteEff(action, atom)
+        self._delete_eff(action, atom)
 
-    def _deleteNegEff(self, action: Action) -> None:
+    def _delete_neg_eff(self, action: Action) -> None:
         atoms = [eff.literal for eff in action.effects]
         atoms = list(filter(
             lambda x: x.negated,
             atoms))
         atom = random.choice(atoms)
-        self._deleteEff(action, atom)
+        self._delete_eff(action, atom)
 
-    def _insertPrecond(
+    def _insert_prec(
             self,
             action: Action,
             atom: Atom) -> None:
@@ -142,23 +142,23 @@ class Fuzzer:
         op.apply()
         self._ops.append(op)
 
-    def _insertPosPrecond(
+    def _insert_pos_prec(
             self,
             action: Action) -> None:
-        atoms = self._getAtomsForInsertion(
+        atoms = self._atoms_for_insertion(
             False, action)
         atom = random.choice(atoms)
-        self._insertPrecond(action, atom)
+        self._insert_prec(action, atom)
 
-    def _insertNegPrecond(
+    def _insert_neg_prec(
             self,
             action: Action) -> None:
-        atoms = self._getAtomsForInsertion(
+        atoms = self._atoms_for_insertion(
             True, action)
         atom = random.choice(atoms)
-        self._insertPrecond(action, atom)
+        self._insert_prec(action, atom)
 
-    def _deletePrecond(
+    def _delete_prec(
             self,
             action: Action) -> bool:
         atoms = (action.precondition,)
@@ -180,18 +180,18 @@ class Fuzzer:
         self._ops.append(op)
         return True
 
-    def _fuzz(self, k=1):
+    def _harden(self, k=1):
         if self.has_neg_prec:
-            ops = [self._insertPosPrecond,
-                   self._insertNegPrecond,
-                   self._insertPosEff,
-                   self._insertNegEff,
-                   self._deletePosEff,
-                   self._deleteNegEff]
+            ops = [self._insert_pos_prec,
+                   self._insert_neg_prec,
+                   self._insert_pos_eff,
+                   self._insert_neg_eff,
+                   self._delete_pos_eff,
+                   self._delete_neg_eff]
         else:
-            ops = [self._insertPosPrecond,
-                   self._insertNegEff,
-                   self._deletePosEff]
+            ops = [self._insert_pos_prec,
+                   self._insert_neg_eff,
+                   self._delete_pos_eff]
         actions = random.sample(self.domain.actions, k)
         for action in actions:
             op = random.choice(ops)
@@ -201,7 +201,7 @@ class Fuzzer:
         count = 0
         while True:
             action = random.choice(self.domain.actions)
-            if self._deletePrecond(action):
+            if self._delete_prec(action):
                 count += 1
             if count == k:
                 break
@@ -245,13 +245,13 @@ class Fuzzer:
             return False
         return True
 
-    def writeDomain(self, out_dir):
+    def output_domain(self, out_dir):
         out_file = os.path.join(
             out_dir, "domain.pddl")
         with open(out_file, "w") as f:
             f.write(self.domain.domain())
 
-    def writeOperations(self, out_dir):
+    def output_operations(self, out_dir):
         out_file = os.path.join(
             out_dir, "fuzz_ops.txt")
         with open(out_file, "w") as f:
@@ -263,6 +263,6 @@ if __name__ == "__main__":
     args = setup()
     fuzzer = Fuzzer(args.rate, args.domain)
     if args.outDomain is not None:
-        fuzzer.writeDomain(args.outDomain)
+        fuzzer.output_domain(args.outDomain)
     if args.outOperations is not None:
-        fuzzer.writeOperations(args.outOperations)
+        fuzzer.output_operations(args.outOperations)
