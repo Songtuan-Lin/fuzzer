@@ -160,25 +160,26 @@ class Fuzzer:
 
     def _delete_prec(
             self,
-            action: Action) -> bool:
+            action: Action) -> None:
         atoms = (action.precondition,)
         if isinstance(action.precondition, Conjunction):
             atoms = action.precondition.parts
         atoms = list(atoms)
-        candidates = []
-        for atom in atoms:
-            for a in self.domain.actions:
-                effs = {e.literal for e in a.effects}
-                if atom in effs:
-                    candidates.append(atom)
-                    break
-        if len(candidates) == 0:
-            return False
-        atom = random.choice(candidates)
+        # candidates = []
+        # for atom in atoms:
+        #     for a in self.domain.actions:
+        #         effs = {e.literal for e in a.effects}
+        #         if atom in effs:
+        #             candidates.append(atom)
+        #             break
+        # if len(candidates) == 0:
+        #     return False
+        # atom = random.choice(candidates)
+        atom = random.choice(atoms)
         op = PrecondDeletion(action, atom)
         op.apply()
         self._ops.append(op)
-        return True
+        # return True
 
     def _harden(self, k=1):
         if self.has_neg_prec:
@@ -198,18 +199,17 @@ class Fuzzer:
             op(action)
 
     def _relax(self, k=1):
-        count = 0
-        while True:
-            action = random.choice(self.domain.actions)
-            if self._delete_prec(action):
-                count += 1
-            if count == k:
-                break
+        # count = 0
+        # while True:
+        #     action = random.choice(self.domain.actions)
+        #     if self._delete_prec(action):
+        #         count += 1
+        #     if count == k:
+        #         break
         # ops = [self._deleteNegEff, self._deletePrecond]
-        # actions = random.sample(self.domain.actions, k)
-        # for action in actions:
-        #     op = random.choice(ops)
-        #     op(action)
+        actions = random.sample(self.domain.actions, k)
+        for action in actions:
+            self._delete_prec(action)
 
     def _validated(self) -> bool:
         illegalFeatures = [
@@ -245,16 +245,12 @@ class Fuzzer:
             return False
         return True
 
-    def output_domain(self, out_dir):
-        out_file = os.path.join(
-            out_dir, "domain.pddl")
-        with open(out_file, "w") as f:
+    def output_domain(self, outfile):
+        with open(outfile, "w") as f:
             f.write(self.domain.domain())
 
-    def output_operations(self, out_dir):
-        out_file = os.path.join(
-            out_dir, "fuzz_ops.txt")
-        with open(out_file, "w") as f:
+    def output_operations(self, outfile):
+        with open(outfile, "w") as f:
             for op in self._ops:
                 f.write("{}\n".format(op))
 

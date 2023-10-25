@@ -110,6 +110,8 @@ if __name__ == '__main__':
             harden_rate = args.harden if args.harden is not None else 0.0
             fuzzer = Fuzzer(harden_rate, relax_rate, domain_file)
             fuzzer.output_domain(modified_outfile)
+            ops_outfile = os.path.join(domain_outdir, "flaws")
+            fuzzer.output_operations(ops_outfile)
         task_names = filter(lambda x: "domain" not in x, os.listdir(domain_dir))
         for task_name in task_names:
             task_file = os.path.join(domain_dir, task_name)
@@ -119,10 +121,10 @@ if __name__ == '__main__':
             task_outfile = os.path.join(task_outdir, task_name)
             cmd = ["cp", task_file, task_outfile]
             exec_cmd(cmd)
-            pos_dir = os.path.join(task_outdir, "positive-plans")
+            pos_dir = os.path.join(task_outdir, "white-list")
             if not os.path.exists(pos_dir):
                 os.mkdir(pos_dir)
-            neg_dir = os.path.join(task_outdir, "negative-plans")
+            neg_dir = os.path.join(task_outdir, "black-list")
             if not os.path.exists(neg_dir):
                 os.mkdir(neg_dir)
             if args.harden is None:
