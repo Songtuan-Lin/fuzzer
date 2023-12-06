@@ -2,6 +2,7 @@ from fd.pddl.conditions import Conjunction
 from fd.pddl.conditions import Truth
 from fd.pddl.effects import Effect
 
+
 class InvalidOperationError(Exception):
     def __init__(self, msg):
         self.msg = msg
@@ -11,7 +12,8 @@ class InvalidOperationError(Exception):
     
     def __repr__(self):
         return str(self)
-    
+
+
 class InvalidDomainError(Exception):
     def __init__(self):
         self.msg = "Unsupport Features"
@@ -22,6 +24,7 @@ class InvalidDomainError(Exception):
     def __repr__(self):
         return str(self)
 
+
 class Operation:
     def __init__(self, action, atom):
         self.action = action
@@ -30,11 +33,17 @@ class Operation:
     def apply(self) -> None:
         raise NotImplementedError
 
+
 class EffInsertion(Operation):
     def __str__(self) -> str:
-        msg = "Add {} to Effects: {}".format(
-                self.atom, 
-                self.action.name)
+        # msg = "Add {} to Effects: {}".format(
+        #         self.atom,
+        #         self.action.name)
+        component = "effPos"
+        if self.atom.negated:
+            component = "effNeg"
+        paras = [self.action.name, self.atom.predicate, component, "1"]
+        msg = ",".join(paras)
         return msg
     
     def __repr__(self) -> str:
@@ -52,10 +61,16 @@ class EffInsertion(Operation):
         eff = Effect([], Truth(), self.atom)
         self.action.effects.append(eff)
 
+
 class EffDeletion(Operation):
     def __str__(self) -> str:
-        msg = "Delete {} from Effects: {}".format(
-                self.atom, self.action.name)
+        # msg = "Delete {} from Effects: {}".format(
+        #         self.atom, self.action.name)
+        component = "effPos"
+        if self.atom.negated:
+            component = "effNeg"
+        paras = [self.action.name, self.atom.predicate, component, "-1"]
+        msg = ",".join(paras)
         return msg
     
     def __repr__(self) -> str:
@@ -76,8 +91,13 @@ class EffDeletion(Operation):
 
 class PrecondInsertion(Operation):
     def __str__(self) -> str:
-        msg = "Add {} to Precondition: {}".format(
-                self.atom, self.action.name)
+        # msg = "Add {} to Precondition: {}".format(
+        #         self.atom, self.action.name)
+        component = "precPos"
+        if self.atom.negated:
+            component = "precNeg"
+        paras = [self.action.name, self.atom.predicate, component, "1"]
+        msg = ",".join(paras)
         return msg
     
     def __repr__(self) -> str:
@@ -99,8 +119,13 @@ class PrecondInsertion(Operation):
 
 class PrecondDeletion(Operation):
     def __str__(self) -> str:
-        msg = "Delete {} from Precondition: {}".format(
-                self.atom, self.action.name)
+        # msg = "Delete {} from Precondition: {}".format(
+        #         self.atom, self.action.name)
+        component = "precPos"
+        if self.atom.negated:
+            component = "precNeg"
+        paras = [self.action.name, self.atom.predicate, component, "-1"]
+        msg = ",".join(paras)
         return msg
 
     def __repr__(self):
