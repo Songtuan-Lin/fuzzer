@@ -110,11 +110,11 @@ if __name__ == '__main__':
             harden_rate = args.harden if args.harden is not None else 0.0
             try:
                 fuzzer = Fuzzer(harden_rate, relax_rate, domain_file)
-            except InvalidDomainError:
+                fuzzer.output_domain(modified_outfile)
+                ops_outfile = os.path.join(domain_outdir, "flaws")
+                fuzzer.output_operations(ops_outfile)
+            except Exception:
                 continue
-            fuzzer.output_domain(modified_outfile)
-            ops_outfile = os.path.join(domain_outdir, "flaws")
-            fuzzer.output_operations(ops_outfile)
         task_names = filter(lambda x: "domain" not in x, os.listdir(domain_dir))
         for task_name in task_names:
             task_file = os.path.join(domain_dir, task_name)
