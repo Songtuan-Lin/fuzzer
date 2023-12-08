@@ -108,7 +108,10 @@ if __name__ == '__main__':
         else:
             relax_rate = args.relax if args.relax is not None else 0.0
             harden_rate = args.harden if args.harden is not None else 0.0
-            fuzzer = Fuzzer(harden_rate, relax_rate, domain_file)
+            try:
+                fuzzer = Fuzzer(harden_rate, relax_rate, domain_file)
+            except InvalidDomainError:
+                continue
             fuzzer.output_domain(modified_outfile)
             ops_outfile = os.path.join(domain_outdir, "flaws")
             fuzzer.output_operations(ops_outfile)

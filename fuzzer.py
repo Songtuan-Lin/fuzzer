@@ -213,7 +213,6 @@ class Fuzzer:
 
     def _validated(self) -> bool:
         illegalFeatures = [
-            ":negative-preconditions",
             ":disjunctive-preconditions",
             ":existential-preconditions",
             ":universal-preconditions",
