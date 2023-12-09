@@ -113,7 +113,10 @@ if __name__ == '__main__':
                 fuzzer.output_domain(modified_outfile)
                 ops_outfile = os.path.join(domain_outdir, "flaws")
                 fuzzer.output_operations(ops_outfile)
-            except Exception:
+            except InvalidDomainError as e:
+                logging.info(e)
+                cmd = ["rm", "-rf", domain_outdir]
+                exec_cmd(cmd)
                 continue
         task_names = filter(lambda x: "domain" not in x, os.listdir(domain_dir))
         for task_name in task_names:
@@ -147,10 +150,13 @@ if __name__ == '__main__':
                 t.output_domain(pos_dir)
                 t.output_task(task_outfile, pos_dir)
             instances.append(pos_dir)
-            dx, dy = Domain(modified_outfile), Domain(domain_outfile)
-            t = Transformer(dx, dy)
-            t.output_domain(neg_dir)
-            t.output_task(task_outfile, neg_dir)
+            try:
+                dx, dy = Domain(modified_outfile), Domain(domain_outfile)
+                t = Transformer(dx, dy)
+                t.output_domain(neg_dir)
+                t.output_task(task_outfile, neg_dir)
+            except Exception as e:
+                logging.error(e)
             instances.append(neg_dir)
     num_cpus = multiprocessing.cpu_count()
     if args.num_cpus is not None:

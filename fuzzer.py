@@ -19,7 +19,7 @@ class Fuzzer:
         self.domain = Domain(domain_file)
         self.has_neg_prec = False
         if not self._validated():
-            raise InvalidDomainError
+            raise InvalidDomainError(domain_file)
         self._ops = []
         self._fetch = (
             lambda negated: lambda xs:

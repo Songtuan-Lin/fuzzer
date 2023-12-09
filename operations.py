@@ -15,8 +15,8 @@ class InvalidOperationError(Exception):
 
 
 class InvalidDomainError(Exception):
-    def __init__(self):
-        self.msg = "Unsupport Features"
+    def __init__(self, domain_file: str):
+        self.msg = "Unsupported features in " + domain_file
     
     def __str__(self):
         return self.msg
