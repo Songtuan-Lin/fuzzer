@@ -37,6 +37,9 @@ parser.add_argument(
 parser.add_argument(
     "--num_cpus", type=int,
     help="number of cpus used")
+parser.add_argument(
+    "--solve", action="store_true",
+    default=False, help="call fast-downward to find plans")
 args = parser.parse_args()
 
 
@@ -118,7 +121,14 @@ if __name__ == '__main__':
                 cmd = ["rm", "-rf", domain_outdir]
                 exec_cmd(cmd)
                 continue
+            except Exception as e:
+                logging.error(str(e) + ":" + str(domain))
+                cmd = ["rm", "-rf", domain_outdir]
+                exec_cmd(cmd)
+                continue
         task_names = filter(lambda x: "domain" not in x, os.listdir(domain_dir))
+        invalid = False
+        tasks = []
         for task_name in task_names:
             task_file = os.path.join(domain_dir, task_name)
             task_outdir = os.path.join(domain_outdir, task_name.replace(".pddl", ""))
@@ -149,17 +159,25 @@ if __name__ == '__main__':
                 t = Transformer(dx, dy)
                 t.output_domain(pos_dir)
                 t.output_task(task_outfile, pos_dir)
-            instances.append(pos_dir)
+            tasks.append(pos_dir)
             try:
                 dx, dy = Domain(modified_outfile), Domain(domain_outfile)
                 t = Transformer(dx, dy)
                 t.output_domain(neg_dir)
                 t.output_task(task_outfile, neg_dir)
             except Exception as e:
-                logging.error(e)
-            instances.append(neg_dir)
-    num_cpus = multiprocessing.cpu_count()
-    if args.num_cpus is not None:
-        num_cpus = args.num_cpus
-    with multiprocessing.Pool(num_cpus) as p:
-        _ = list(tqdm(p.imap_unordered(solve, instances), total=len(instances)))
+                logging.error(str(e) + ":" + str(domain))
+                invalid = True
+                break
+            tasks.append(neg_dir)
+        if invalid:
+            cmd = ["rm", "-rf", domain_outdir]
+            exec_cmd(cmd)
+        else:
+            instances += tasks
+    if args.solve:
+        num_cpus = multiprocessing.cpu_count()
+        if args.num_cpus is not None:
+            num_cpus = args.num_cpus
+        with multiprocessing.Pool(num_cpus) as p:
+            _ = list(tqdm(p.imap_unordered(solve, instances), total=len(instances)))
