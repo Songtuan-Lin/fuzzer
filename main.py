@@ -80,7 +80,7 @@ def solve(outdir):
         "--sas-file",
         sas_file,
         "--alias",
-        "lama",
+        "lama-first",
         domain_file,
         task_file]
     exec_cmd(cmd)
