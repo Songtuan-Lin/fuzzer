@@ -182,17 +182,24 @@ class Fuzzer:
         # return True
 
     def _harden(self, k=1):
+        # if self.has_neg_prec:
+        #     ops = [self._insert_pos_prec,
+        #            self._insert_neg_prec,
+        #            self._insert_pos_eff,
+        #            self._insert_neg_eff,
+        #            self._delete_pos_eff,
+        #            self._delete_neg_eff]
+        # else:
+        #     ops = [self._insert_pos_prec,
+        #            self._insert_neg_eff,
+        #            self._delete_pos_eff]
+        ops = [
+            self._insert_pos_prec,
+            self._insert_neg_eff,
+            self._delete_pos_eff
+        ]
         if self.has_neg_prec:
-            ops = [self._insert_pos_prec,
-                   self._insert_neg_prec,
-                   self._insert_pos_eff,
-                   self._insert_neg_eff,
-                   self._delete_pos_eff,
-                   self._delete_neg_eff]
-        else:
-            ops = [self._insert_pos_prec,
-                   self._insert_neg_eff,
-                   self._delete_pos_eff]
+            ops.append(self._insert_neg_prec)
         actions = random.sample(self.domain.actions, k)
         for action in actions:
             op = random.choice(ops)
@@ -206,10 +213,16 @@ class Fuzzer:
         #         count += 1
         #     if count == k:
         #         break
-        # ops = [self._deleteNegEff, self._deletePrecond]
+        ops = [
+            self._insert_pos_eff,
+            self._deleteNegEff,
+            self._deletePrecond
+        ]
         actions = random.sample(self.domain.actions, k)
         for action in actions:
-            self._delete_prec(action)
+            # self._delete_prec(action)
+            op = random.choice(ops)
+            op(action)
 
     def _validated(self) -> bool:
         illegalFeatures = [
