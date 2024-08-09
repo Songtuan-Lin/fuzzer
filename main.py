@@ -155,10 +155,15 @@ if __name__ == '__main__':
                 cmd = ["cp", task_outfile, task_tempfile]
                 exec_cmd(cmd)
             else:
-                dx, dy = Domain(domain_outfile), Domain(modified_outfile)
-                t = Transformer(dx, dy)
-                t.output_domain(pos_dir)
-                t.output_task(task_outfile, pos_dir)
+                try:
+                    dx, dy = Domain(domain_outfile), Domain(modified_outfile)
+                    t = Transformer(dx, dy)
+                    t.output_domain(pos_dir)
+                    t.output_task(task_outfile, pos_dir)
+                except Exception as e:
+                    logging.error(str(e) + ":" + str(domain))
+                    invalid = True
+                    break
             tasks.append(pos_dir)
             try:
                 dx, dy = Domain(modified_outfile), Domain(domain_outfile)
