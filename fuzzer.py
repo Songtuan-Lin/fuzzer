@@ -215,8 +215,8 @@ class Fuzzer:
         #         break
         ops = [
             self._insert_pos_eff,
-            self._deleteNegEff,
-            self._deletePrecond
+            self._delete_neg_eff,
+            self._delete_prec,
         ]
         actions = random.sample(self.domain.actions, k)
         for action in actions:
