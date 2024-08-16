@@ -146,7 +146,7 @@ if __name__ == '__main__':
             neg_dir = os.path.join(task_outdir, "black-list")
             if not os.path.exists(neg_dir):
                 os.mkdir(neg_dir)
-            if args.loose_white_list is not None:
+            if args.loose_white_list:
                 # if we do not harden the problem
                 # we then relax the definition of positive plans
                 # such that a positive plan only need to be a
