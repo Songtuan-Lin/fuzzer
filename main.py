@@ -38,6 +38,9 @@ parser.add_argument(
     "--num_cpus", type=int,
     help="number of cpus used")
 parser.add_argument(
+    "--loose_white_list", action="store_true",
+    help="use relaxed white-list criterion")
+parser.add_argument(
     "--solve", action="store_true",
     default=False, help="call fast-downward to find plans")
 args = parser.parse_args()
@@ -143,7 +146,7 @@ if __name__ == '__main__':
             neg_dir = os.path.join(task_outdir, "black-list")
             if not os.path.exists(neg_dir):
                 os.mkdir(neg_dir)
-            if args.harden is None:
+            if args.loose_white_list is not None:
                 # if we do not harden the problem
                 # we then relax the definition of positive plans
                 # such that a positive plan only need to be a
